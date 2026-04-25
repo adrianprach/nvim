@@ -2,19 +2,27 @@
 require("nvchad.configs.lspconfig").defaults()
 local nvlsp = require "nvchad.configs.lspconfig"
 
--- Robust root discovery function for macOS (finds uv, git, or cmake projects)
-local function get_root(fname)
-  local root_files = { '.git', 'pyproject.toml', 'uv.lock', 'CMakeLists.txt', '.venv', 'requirements.txt' }
-  local found = vim.fs.find(root_files, { upward = true, path = fname })[1]
-  return found and vim.fs.dirname(found) or vim.uv.cwd()
-end
+-- Project roots for vim.lsp (uses |vim.fs.root()|). Do not use a sync `root_dir(fname)` here:
+-- Neovim expects `root_dir(bufnr, on_dir)` and must call `on_dir()`, or no client ever starts.
+local root_markers = {
+  "compile_commands.json",
+  "CMakeLists.txt",
+  "meson.build",
+  ".clangd",
+  "package.json",
+  "pyproject.toml",
+  "uv.lock",
+  ".git",
+  ".venv",
+  "requirements.txt",
+}
 
 -- Base configuration shared by all servers
 local base_config = {
   on_attach = nvlsp.on_attach,
   on_init = nvlsp.on_init,
   capabilities = nvlsp.capabilities,
-  root_dir = get_root,
+  root_markers = root_markers,
 }
 
 -- 2. FIX: Disable Ruff's empty hover so Pyright can show documentation
@@ -28,7 +36,7 @@ local base_config = {
 --   end,
 -- })
 
--- C++ (clangd)
+-- C/C++ (clangd): completion, clang-tidy diagnostics, includes — same role as Pyright+Ruff for Python.
 vim.lsp.config("clangd", vim.tbl_deep_extend("force", base_config, {
   cmd = {
     "clangd",
@@ -38,23 +46,32 @@ vim.lsp.config("clangd", vim.tbl_deep_extend("force", base_config, {
     "--completion-style=detailed",
     "--function-arg-placeholders",
     "--fallback-style=llvm",
+    "--cross-file-rename",
+  },
+  init_options = {
+    clangdFileStatus = true,
   },
 }))
 
-vim.lsp.config("pyright", {
-  settings = {
-    pyright = {
-      -- Using Ruff's import organizer
-      disableOrganizeImports = true,
-    },
-    python = {
-      analysis = {
-        -- Ignore all files for analysis to exclusively use Ruff for linting
-        ignore = { '*' },
+vim.lsp.config(
+  "pyright",
+  vim.tbl_deep_extend("force", {
+    root_markers = root_markers,
+  }, {
+    settings = {
+      pyright = {
+        -- Using Ruff's import organizer
+        disableOrganizeImports = true,
+      },
+      python = {
+        analysis = {
+          -- Ignore all files for analysis to exclusively use Ruff for linting
+          ignore = { "*" },
+        },
       },
     },
-  },
-})
+  })
+)
 
 -- vim.lsp.config('ruff', {
 --   init_options = {
@@ -88,7 +105,7 @@ local servers = { "html", "cssls", "clangd", "ruff", "pyright" }
 
 -- 5. Force-start LSPs when opening a file (Ensures attachment on macOS)
 vim.api.nvim_create_autocmd("FileType", {
-  pattern = { "python", "cpp", "c", "html", "css", "py" },
+  pattern = { "python", "cpp", "c", "cuda", "html", "css", "py" },
   callback = function()
     vim.lsp.enable(servers)
   end,

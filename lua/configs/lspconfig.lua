@@ -95,18 +95,79 @@ vim.api.nvim_create_autocmd("LspAttach", {
   desc = 'LSP: Disable hover capability from Ruff',
 })
 
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = vim.api.nvim_create_augroup("lsp_attach_enable_inlay_hints", { clear = true }),
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client == nil or client.name ~= "ts_ls" then
+      return
+    end
+
+    if vim.lsp.inlay_hint then
+      vim.lsp.inlay_hint.enable(true, { bufnr = args.buf })
+    end
+  end,
+  desc = "LSP: Enable TypeScript inlay hints",
+})
+
 -- Simple Web Servers
 vim.lsp.config("html", base_config)
 vim.lsp.config("cssls", base_config)
+vim.lsp.config("jsonls", base_config)
+vim.lsp.config("emmet_language_server", base_config)
 
--- 4. Enable All Servers
-local servers = { "html", "cssls", "clangd", "ruff", "pyright" }
--- vim.lsp.enable(servers)
+-- React / React Native / Expo
+vim.lsp.config("ts_ls", vim.tbl_deep_extend("force", base_config, {
+  init_options = {
+    hostInfo = "neovim",
+    preferences = {
+      includeCompletionsForModuleExports = true,
+      includeCompletionsForImportStatements = true,
+      includeCompletionsWithInsertText = true,
+      includeCompletionsWithSnippetText = true,
+      includeAutomaticOptionalChainCompletions = true,
+      importModuleSpecifierPreference = "shortest",
+      importModuleSpecifierEnding = "minimal",
+    },
+  },
+  settings = {
+    typescript = {
+      suggest = {
+        completeFunctionCalls = true,
+      },
+      inlayHints = {
+        includeInlayParameterNameHints = "literals",
+        includeInlayParameterNameHintsWhenArgumentMatchesName = false,
+        includeInlayFunctionParameterTypeHints = true,
+        includeInlayVariableTypeHints = true,
+      },
+    },
+    javascript = {
+      suggest = {
+        completeFunctionCalls = true,
+      },
+      inlayHints = {
+        includeInlayParameterNameHints = "literals",
+        includeInlayParameterNameHintsWhenArgumentMatchesName = false,
+        includeInlayFunctionParameterTypeHints = true,
+        includeInlayVariableTypeHints = true,
+      },
+    },
+  },
+}))
+vim.lsp.config("eslint", base_config)
+vim.lsp.config("tailwindcss", base_config)
 
--- 5. Force-start LSPs when opening a file (Ensures attachment on macOS)
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = { "python", "cpp", "c", "cuda", "html", "css", "py" },
-  callback = function()
-    vim.lsp.enable(servers)
-  end,
-})
+-- Enable once; filetype/root matching decides which clients actually start.
+vim.lsp.enable {
+  "html",
+  "cssls",
+  "jsonls",
+  "emmet_language_server",
+  "ts_ls",
+  "eslint",
+  "tailwindcss",
+  "clangd",
+  "ruff",
+  "pyright",
+}

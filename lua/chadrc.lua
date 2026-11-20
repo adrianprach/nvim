@@ -7,6 +7,7 @@ local M = {}
 
 M.base46 = {
   theme = "dark_horizon",
+  transparency = true, -- let the terminal's background (and its opacity/blur) show through
 
   -- hl_override = {
   --     Comment = { italic = true },
